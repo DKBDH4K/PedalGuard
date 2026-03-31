@@ -21,6 +21,7 @@
  * - POST /api/alert -> Receives a JSON payload with alert details.
  *
  * Version: 2.0 - Accurate Timestamp Handling
+ * This is the final Arduino code for ESP8266
  */
 
 // --- LIBRARIES ---
