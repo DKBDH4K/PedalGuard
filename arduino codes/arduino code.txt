@@ -1,0 +1,227 @@
+/*
+  IoT Anti-Theft System with Web App Integration
+
+  This sketch enables two-way communication with a web application to create a
+  complete anti-theft system.
+
+  Features:
+  - Connects to Wi-Fi.
+  - Polls a web server to get the system's armed/disarmed status.
+  - When armed, monitors ADXL345 accelerometer and a vibration sensor.
+  - If motion is detected, it activates a buzzer and sends an alert with GPS
+    coordinates and motion data to a web server endpoint.
+  - Continuously reads GPS data in the background.
+
+  Libraries Needed:
+  - ESP8266WiFi
+  - ESP8266HTTPClient
+  - ArduinoJson (by Benoit Blanchon)
+  - TinyGPS++ (by Mikal Hart)
+  - Adafruit ADXL345 (by Adafruit)
+  - Adafruit Unified Sensor (by Adafruit)
+  - SoftwareSerial
+*/
+
+// --- LIBRARIES ---
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <ArduinoJson.h>      // For handling JSON data with the web app
+#include <SoftwareSerial.h>   // For GPS module
+#include <TinyGPS++.h>         // For parsing GPS data
+#include <Wire.h>              // For I2C communication (ADXL345)
+#include <Adafruit_ADXL345_U.h>
+#include <Adafruit_Sensor.h>
+
+// --- CONFIGURATION ---
+const char* ssid = "YOUR_WIFI_SSID";         // Replace with your Wi-Fi network name
+const char* password = "YOUR_WIFI_PASSWORD"; // Replace with your Wi-Fi password
+
+// !!! IMPORTANT: REPLACE WITH YOUR WEB APP URLS !!!
+const char* getStatusUrl = "http://your-web-app.com/api/getstatus?deviceId=123";
+const char* sendAlertUrl = "http://your-web-app.com/api/alert";
+
+// --- PIN DEFINITIONS ---
+#define VIBRATION_PIN   D5  // GPIO14 - Digital Out (DO) of the vibration sensor
+#define BUZZER_PIN      D6  // GPIO12 - To control the buzzer or a relay
+#define GPS_RX_PIN      D7  // GPIO13 - Connect to the TX pin of the GPS module
+#define GPS_TX_PIN      D8  // GPIO15 - Connect to the RX pin of the GPS module
+
+// --- GLOBAL OBJECTS & VARIABLES ---
+TinyGPSPlus gps;
+SoftwareSerial ss(GPS_RX_PIN, GPS_TX_PIN);
+Adafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);
+
+// System state machine
+enum SystemState { DISARMED, ARMED, TRIGGERED };
+SystemState currentState = DISARMED;
+
+// Timing for non-blocking loops
+unsigned long lastStatusCheck = 0;
+const long statusCheckInterval = 5000; // Check web app every 5 seconds
+
+// ===============================================================
+// SETUP: Runs once
+// ===============================================================
+void setup() {
+  Serial.begin(115200);
+  Wire.begin();       // Init I2C for ADXL345 (SDA=D2, SCL=D1)
+  ss.begin(9600);     // Init serial for GPS
+
+  pinMode(VIBRATION_PIN, INPUT_PULLUP);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW); // Buzzer off
+
+  Serial.println("\n--- Anti-Theft System Initializing ---");
+
+  connectToWiFi();
+
+  if (!accel.begin()) {
+    Serial.println("Error: ADXL345 sensor not found!");
+    while (1);
+  }
+  accel.setRange(ADXL345_RANGE_4_G);
+  Serial.println("ADXL345 Initialized.");
+
+  Serial.println("Setup complete. Awaiting commands from server...");
+}
+
+// ===============================================================
+// LOOP: Runs continuously
+// ===============================================================
+void loop() {
+  // Always listen for GPS data in the background
+  while (ss.available() > 0) {
+    gps.encode(ss.read());
+  }
+
+  // Periodically check the web app for the system's status
+  if (millis() - lastStatusCheck > statusCheckInterval) {
+    checkSystemStatus();
+    lastStatusCheck = millis();
+  }
+
+  // --- Main Logic based on State ---
+  if (currentState == ARMED) {
+    // Read the vibration sensor state (active LOW)
+    int vibrationState = digitalRead(VIBRATION_PIN);
+
+    if (vibrationState == LOW) {
+      Serial.println("!!! MOTION DETECTED !!!");
+      currentState = TRIGGERED;
+      digitalWrite(BUZZER_PIN, HIGH); // Turn buzzer ON
+      sendAlertToWebApp();
+    }
+  }
+}
+
+// ===============================================================
+// --- Custom Functions ---
+// ===============================================================
+
+void connectToWiFi() {
+  Serial.print("Connecting to WiFi...");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected! IP: " + WiFi.localIP().toString());
+}
+
+/**
+ * @brief Checks the web app to get the current desired state (ARMED/DISARMED).
+ */
+void checkSystemStatus() {
+  HTTPClient http;
+  WiFiClient client;
+
+  Serial.print("Checking system status from server... ");
+  http.begin(client, getStatusUrl);
+
+  int httpCode = http.GET();
+
+  if (httpCode > 0) {
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+      Serial.println("Payload: " + payload);
+
+      // Parse the JSON response
+      JsonDocument doc;
+      DeserializationError error = deserializeJson(doc, payload);
+
+      if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+      }
+
+      const char* status = doc["status"]; // Expects JSON like: {"status": "ARMED"}
+
+      if (strcmp(status, "ARMED") == 0) {
+        if (currentState == DISARMED) {
+          Serial.println("System state changed to: ARMED");
+          currentState = ARMED;
+        }
+      } else { // Assumed DISARMED
+        if (currentState != DISARMED) {
+          Serial.println("System state changed to: DISARMED");
+          currentState = DISARMED;
+          digitalWrite(BUZZER_PIN, LOW); // Turn buzzer OFF
+        }
+      }
+    }
+  } else {
+    Serial.printf("GET failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+}
+
+/**
+ * @brief Sends an alert to the web app with sensor and location data.
+ */
+void sendAlertToWebApp() {
+  HTTPClient http;
+  WiFiClient client;
+
+  http.begin(client, sendAlertUrl);
+  http.addHeader("Content-Type", "application/json");
+
+  // Get accelerometer data
+  sensors_event_t event;
+  accel.getEvent(&event);
+
+  // Create JSON document
+  JsonDocument doc;
+  doc["deviceId"] = "123"; // Should match the deviceId in the URL
+  doc["type"] = "VibrationAlert";
+
+  // Add GPS data
+  if (gps.location.isValid()) {
+    doc["latitude"] = gps.location.lat();
+    doc["longitude"] = gps.location.lng();
+  } else {
+    doc["latitude"] = 0;
+    doc["longitude"] = 0;
+  }
+  
+  // Add accelerometer data
+  doc["accelX"] = event.acceleration.x;
+  doc["accelY"] = event.acceleration.y;
+  doc["accelZ"] = event.acceleration.z;
+
+  String requestBody;
+  serializeJson(doc, requestBody);
+
+  Serial.println("Sending alert to server: " + requestBody);
+
+  int httpCode = http.POST(requestBody);
+
+  if (httpCode > 0) {
+    String response = http.getString();
+    Serial.println("Server response: " + response);
+  } else {
+    Serial.printf("POST failed, error: %s\n", http.errorToString(httpCode).c_str());
+  }
+
+  http.end();
+}

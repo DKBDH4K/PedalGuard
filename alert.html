@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PedalGuard Alert History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+  />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+  <style>
+    body { font-family: "Poppins", sans-serif; }
+    #tsparticles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -10; }
+    .glass-container { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); padding: 1.5rem; max-width: 48rem; margin-top: 1rem; }
+    .glass-button { padding: 0.5rem 1.5rem; border: none; border-radius: 50px; font-size: 0.875rem; font-weight: 600; color: rgba(255, 255, 255, 0.9); cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); background: linear-gradient(135deg, rgba(142, 45, 226, 0.2), rgba(74, 0, 224, 0.1)); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); position: relative; overflow: hidden; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+    .glass-button::before { content: ''; display: block; position: absolute; top: -50%; left: -100%; width: 70%; height: 200%; opacity: 0.6; background: linear-gradient( to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.05) 20%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.05) 80%, rgba(255, 255, 255, 0) 100% ); transform: skewX(-25deg); animation: shine 4s infinite linear; }
+    .glass-button:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 12px 40px 0 rgba(74, 0, 224, 0.4); background: linear-gradient(135deg, rgba(142, 45, 226, 0.3), rgba(74, 0, 224, 0.2)); }
+    @keyframes shine { 0% { left: -100%; } 100% { left: 130%; } }
+  </style>
+</head>
+<body class="text-white min-h-screen flex flex-col">
+  <div id="tsparticles"></div>
+  <div class="bg-[#6c2efb] h-3 w-full"></div>
+
+  <nav class="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <a href="Home.html" class="flex items-center space-x-2">
+        <i class="fas fa-bicycle text-[#b18aff] text-xl"></i>
+       <span class="font-semibold text-white text-lg select-none">PedalGuard</span>
+       </a>
+    <ul class="hidden md:flex items-center space-x-6 text-white text-sm font-semibold">
+      <li class="cursor-pointer select-none hover:underline">Settings</li>
+      <li class="cursor-pointer select-none hover:underline">Support</li>
+      <li><button aria-label="Search" class="text-white hover:text-[#b18aff]"><i class="fas fa-search"></i></button></li>
+      <li><button class="glass-button">Get Protected</button></li>
+    </ul>
+  </nav>
+
+  <main class="flex-grow max-w-5xl mx-auto px-6 py-12 w-full">
+    <h1 class="text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#b18aff] to-[#6c8aff] mb-10">
+      Alert History
+    </h1>
+    
+    <section>
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold text-white">Recent Alerts</h2>
+        <button id="clearAllBtn" class="text-sm font-semibold text-red-400 hover:text-red-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          Clear All History
+        </button>
+      </div>
+      <div class="glass-container">
+        <ul id="alertList" class="space-y-4 max-w-full">
+      
+        </ul>
+      </div>
+    </section>
+  </main>
+  
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+
+  <script>
+    tsParticles.load("tsparticles", {
+        background: { color: "#0a0a0a" },
+        particles: {
+            number: { value: 160 },
+            color: { value: "#ffffff" },
+            links: { enable: false },
+            move: {
+                enable: true,
+                speed: 0.5,
+                direction: "none",
+                outModes: { default: "out" },
+            },
+            size: { value: { min: 0.5, max: 2.5 } },
+            opacity: { value: { min: 0.1, max: 0.8 } },
+        },
+        interactivity: {
+            events: { onHover: { enable: true, mode: "bubble" } },
+            modes: {
+                bubble: { distance: 250, duration: 2, size: 4, opacity: 1 },
+            },
+        },
+    });
+   
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY", 
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DATABASE_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    if (!firebase.apps.length) { 
+      firebase.initializeApp(firebaseConfig); 
+    }
+
+   const page_database = firebase.database(); // <-- Renamed
+   const page_alertsRef = page_database.ref('alerts'); // <-- Renamed
+    const alertList = document.getElementById("alertList");
+    const clearAllBtn = document.getElementById("clearAllBtn");
+    let localAlerts = []; 
+
+    clearAllBtn.addEventListener('click', () => {
+        if (confirm("Are you sure you want to delete all alerts? This cannot be undone.")) {
+             page_alertsRef.remove() // <-- Use renamed variable
+                .then(() => console.log("All alerts deleted successfully."))
+                .catch((error) => console.error("Error deleting alerts: ", error));
+        }
+    });
+    
+       page_alertsRef.on('value', (snapshot) => { // <-- Use renamed variable
+        localAlerts = []; 
+        if (snapshot.exists()) {
+         
+            snapshot.forEach(childSnapshot => {
+                const alertData = childSnapshot.val();
+                alertData.key = childSnapshot.key;
+                localAlerts.push(alertData);
+            });
+           
+            localAlerts.sort((a, b) => b.serverTimestamp - a.serverTimestamp);
+        }
+        renderAlerts(); 
+    });
+
+
+    function renderAlerts() {
+      clearAllBtn.disabled = localAlerts.length === 0;
+      alertList.innerHTML = ""; 
+      
+  
+      if (localAlerts.length === 0) {
+        const emptyMsg = document.createElement("p");
+        emptyMsg.className = "text-gray-400 italic";
+        emptyMsg.textContent = "No alerts yet. Listening for new events...";
+        alertList.appendChild(emptyMsg);
+        return;
+      }
+
+      localAlerts.forEach(alert => {
+        const li = document.createElement("li");
+        li.className = "bg-[#1f2a3a] rounded-lg p-4 flex justify-between items-center border border-transparent hover:border-[#3a6fff] transition";
+        
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "flex items-center space-x-4 max-w-[85%]";
+        
+        const triggerType = alert.trigger || "Unknown";
+        const isVibration = triggerType.toLowerCase().includes('vibration');
+
+        const severityColors = { vibration: "text-yellow-400", movement: "text-red-500" };
+        const iconClasses = { vibration: "fas fa-wave-square", movement: "fas fa-exclamation-triangle" };
+
+        const severityIcon = document.createElement("i");
+      
+        severityIcon.className = `text-2xl ${isVibration ? iconClasses.vibration : iconClasses.movement} ${isVibration ? severityColors.vibration : severityColors.movement}`;
+        severityIcon.title = triggerType;
+
+        const textDiv = document.createElement("div");
+        
+        const messageSpan = document.createElement("span");
+        messageSpan.className = "font-semibold text-white text-lg break-words";
+        messageSpan.textContent = `Alert: ${triggerType} Detected`;
+        
+        const locationSpan = document.createElement("span");
+        locationSpan.className = "text-gray-300 text-sm mt-1 block";
+
+        if (alert.location && typeof alert.location === 'object' && alert.location.lat) {
+            locationSpan.innerHTML = `<i class="fas fa-map-marker-alt mr-1"></i> Lat: ${alert.location.lat.toFixed(5)}, Lng: ${alert.location.lng.toFixed(5)}`;
+        } else {
+            locationSpan.textContent = "Location data unavailable for this alert.";
+        }
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "text-gray-400 text-xs mt-1 block";
+        dateSpan.textContent = new Date(alert.serverTimestamp).toLocaleString();
+        
+        textDiv.appendChild(messageSpan);
+        textDiv.appendChild(locationSpan);
+        textDiv.appendChild(dateSpan);
+        infoDiv.appendChild(severityIcon);
+        infoDiv.appendChild(textDiv);
+        
+        const delBtn = document.createElement("button");
+        delBtn.className = "text-[#6c2efb] hover:text-[#3a6fff] transition text-xl ml-4";
+        delBtn.setAttribute("aria-label", "Delete alert");
+        delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        
+        delBtn.addEventListener("click", (e) => { 
+            e.stopPropagation(); 
+            page_database.ref('alerts/' + alert.key).remove(); // <-- Use renamed variable 
+        });
+        
+        li.appendChild(infoDiv);
+        li.appendChild(delBtn);
+        alertList.appendChild(li);
+      });
+    }
+
+    renderAlerts();
+  </script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+
+<script src="global-notifications.js"></script>
+</body>
+</html>
+

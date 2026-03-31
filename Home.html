@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PedalGuard - Bike Theft Protection</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Google Sans', Arial, sans-serif;
+    }
+    
+    #tsparticles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -10;
+    }
+
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background-color: #1a1a2e;
+      border: 1px solid #4a00e0;
+      border-radius: 0.5rem;
+      min-width: 200px;
+      z-index: 1000;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .dropdown-menu a {
+      display: block;
+      padding: 0.75rem 1rem;
+      color: #e2e8f0;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+    .dropdown-menu a:hover {
+      background-color: #4a00e0;
+      color: white;
+    }
+    .dropdown:hover .dropdown-menu {
+      display: block;
+    }
+
+    .glass-button {
+        padding: 1rem 2.5rem;
+        border: none;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.9);
+        cursor: pointer;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        background: linear-gradient(135deg, rgba(142, 45, 226, 0.2), rgba(74, 0, 224, 0.1));
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+    .glass-button::before {
+        content: '';
+        display: block;
+        position: absolute;
+        top: -50%;
+        left: -100%;
+        width: 70%;
+        height: 200%;
+        opacity: 0.6;
+        background: linear-gradient( to right, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.05) 20%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.05) 80%, rgba(255, 255, 255, 0) 100% );
+        transform: skewX(-25deg);
+        animation: shine 4s infinite linear;
+    }
+    .glass-button:hover {
+        transform: translateY(-3px) scale(1.05);
+        box-shadow: 0 12px 40px 0 rgba(74, 0, 224, 0.4);
+        background: linear-gradient(135deg, rgba(142, 45, 226, 0.3), rgba(74, 0, 224, 0.2));
+    }
+    @keyframes shine {
+        0% { left: -100%; }
+        100% { left: 130%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="tsparticles"></div>
+
+  <div class="w-full">
+    <div class="w-full text-white text-xs font-semibold text-center py-2" style="background: linear-gradient(90deg, #4a00e0 0%, #8e2de2 50%, #6a11cb 100%)">
+    </div>
+
+    <div class="relative w-full px-4 sm:px-6 lg:px-8" style="background: transparent;">
+      <div aria-hidden="true" class="absolute inset-0" style="clip-path: polygon(0 0, 100% 0, 100% 100%, 0 70%)">
+        <img alt="Dark gradient background" class="w-full h-full object-cover opacity-10" src="https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?ixlib=rb-1.2.1&auto=format&fit=crop&w=1920&q=80" />
+      </div>
+      <div class="relative flex items-center justify-between h-20 max-w-7xl mx-auto">
+        <a class="flex items-center space-x-2 text-white text-lg font-normal" href="#">
+          <i class="fas fa-bicycle text-2xl text-purple-400"></i>
+          <span class="font-bold">PedalGuard</span>
+        </a>
+        <nav class="hidden md:flex items-center space-x-6 text-white font-semibold text-sm">
+          <a class="hover:text-purple-300 transition-colors" href="#"></a>
+          <a class="hover:text-purple-300 transition-colors" href="#"></a>
+          <a class="hover:text-purple-300 transition-colors" href="#"></a>
+          <a class="hover:text-purple-300 transition-colors" href="Feedback.html"></a>
+          <button class="ml-4 text-white hover:text-purple-300 focus:outline-none transition-colors">
+            <i class=""></i>
+          </button>
+          <div class="ml-6 relative dropdown">
+            <button class="text-white hover:text-purple-300 focus:outline-none transition-colors">
+              <i class="fas fa-user-shield text-xl"></i>
+            </button>
+            <div class="dropdown-menu">
+              <a href="#"><i class="fas fa-shield-alt mr-2"></i> Get Protected</a>
+              <a href="#"><i class="fas fa-question-circle mr-2"></i> Help</a>
+              <a href="#" id="logoutBtn"><i class="fas fa-sign-out-alt mr-2"></i> Log Out</a>
+            </div>
+          </div>
+        </nav>
+      </div>
+      <div class="md:hidden flex items-center justify-between py-4">
+        <a class="flex items-center space-x-2 text-white text-lg font-normal" href="#">
+          <i class="fas fa-bicycle text-2xl text-purple-400"></i>
+          <span class="font-bold">PedalGuard</span>
+        </a>
+        <a class="bg-purple-600 text-white font-semibold rounded-full px-4 py-2 text-sm hover:bg-purple-700" href="#">
+          Get Protected
+        </a>
+      </div>
+    </div>
+
+    <div class="w-full" style="background: transparent;">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-white font-extrabold text-3xl sm:text-4xl md:text-5xl text-center py-16">
+        <span class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-500">
+          Protect Your Bike Like Never Before
+        </span>
+      </div>
+      <div class="max-w-2xl mx-auto px-4 text-gray-300 font-medium text-lg sm:text-xl text-center pb-12">
+        Welcome back, <span id="username" class="text-purple-300 font-semibold">[Username]</span>! Your bike is protected with real-time tracking and instant theft alerts.
+      </div>
+      <div class="flex justify-center pb-24">
+        <button class="glass-button">
+            <i class="fas fa-shield-alt mr-2"></i> Premium Features Comming Soon
+        </button>
+      </div>
+
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8 pb-24">
+        <a href="loc.html" class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 hover:border-purple-500 hover:bg-gray-700/60 hover:shadow-lg hover:scale-105 transform transition-all duration-300">
+            <div class="text-purple-400 mb-4 text-3xl">
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Live GPS Tracking</h3>
+            <p class="text-gray-400">Follow your bike's location in real-time with millimeter precision.</p>
+        </a>
+
+        <a href="alert.html" class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-700/60 hover:shadow-lg hover:scale-105 transform transition-all duration-300">
+            <div class="text-blue-400 mb-4 text-3xl">
+                <i class="fas fa-bell"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Instant Alerts</h3>
+            <p class="text-gray-400">Get notified the moment suspicious movement is detected.</p>
+        </a>
+
+        <div class="bg-gray-800/50 backdrop-blur-sm p-6 rounded-xl border border-gray-700 hover:border-purple-500 hover:bg-gray-700/60 hover:shadow-lg hover:scale-105 transform transition-all duration-300">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="text-purple-400 mb-4 text-3xl">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-2">Smart Lock</h3>
+                    <p class="text-gray-400 mb-4">Remotely disable our smart locking system.</p>
+                </div>
+                <div class="relative">
+                    <button id="lockButton" class="flex items-center justify-center w-24 h-10 rounded-full bg-gray-700 text-white font-medium text-sm transition-colors duration-300 hover:bg-gray-600">
+                        <span id="lockButtonText">DISARMED</span>
+                    </button>
+                </div>
+            </div>
+            <div class="mt-4 text-xs text-gray-500 flex items-center">
+                <i class="fas fa-info-circle mr-1"></i>
+                <span>Current status: <span id="lockStatusText" class="font-medium text-gray-300">DISARMED</span></span>
+            </div>
+        </div>
+      </div> 
+    </div> 
+    
+    <footer class="text-white py-12" style="background: transparent;">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div>
+            <h3 class="text-lg font-bold mb-4">PedalGuard</h3>
+            <p class="text-gray-400">Your vehicle's first line of defense against theft.</p>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold mb-4">Company</h3>
+            <ul class="space-y-2">
+              <li><a href="aboutus.html" class="text-gray-400 hover:text-white">About Us</a></li>
+              <li><a href="mailto:chandekararpan@gmail.com" class="text-gray-400 hover:text-white">Contact : chandekararpan@gmail.com</a></li>
+              <li><a href="mailto:xyz@gmail.com" class="text-gray-400 hover:text-white">Contact : xyz@gmail.com</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold mb-4">Connect</h3>
+            <div class="flex space-x-4">
+              <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-facebook-f"></i></a>
+              <a href="#" class="text-gray-400 hover:text-white"><i class="fab fa-twitter"></i></a>
+              <a href="https://www.instagram.com/arpann._05?igsh=NHptczgzemIxcXNo" class="text-gray-400 hover:text-white"><i class="fab fa-instagram"></i></a>
+            </div>
+          </div>
+        </div>
+        <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+          <p>© 2025 PedalGuard. All rights reserved.</p>
+        </div>
+      </div>
+    </footer>
+  </div> 
+
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+     
+      tsParticles.load("tsparticles", {
+            background: {
+                color: "#0a0a0a",
+            },
+            particles: {
+                number: { value: 160 },
+                color: { value: "#ffffff" },
+                links: {
+                    enable: false,
+                },
+                move: {
+                    enable: true,
+                    speed: 0.5,
+                    direction: "none",
+                    outModes: {
+                        default: "out",
+                    },
+                },
+                size: {
+                    value: { min: 0.5, max: 2.5 },
+                },
+                opacity: {
+                    value: { min: 0.1, max: 0.8 },
+                },
+            },
+            interactivity: {
+                events: {
+                    onHover: {
+                        enable: true,
+                        mode: "bubble",
+                    },
+                },
+                modes: {
+                    bubble: {
+                        distance: 250,
+                        duration: 2,
+                        size: 4,
+                        opacity: 1,
+                    },
+                },
+            },
+        });
+
+   
+      const urlParams = new URLSearchParams(window.location.search);
+      const username = urlParams.get('username') || 'Valued Customer';
+      document.getElementById('username').textContent = username;
+
+      document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        e.preventDefault();
+        window.location.href = 'login.html';
+      });
+
+
+      const lockButton = document.getElementById('lockButton');
+      const lockButtonText = document.getElementById('lockButtonText');
+      const lockStatusText = document.getElementById('lockStatusText');
+      let isLocked = false; 
+
+      const serverUrl = 'http://localhost:3000'; 
+
+   
+      function updateLockUI(locked) {
+        isLocked = locked;
+        if (isLocked) {
+          lockButtonText.textContent = 'ARMED';
+          lockButton.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+          lockButton.classList.add('bg-purple-600', 'hover:bg-purple-700');
+          lockStatusText.textContent = 'ARMED';
+          lockStatusText.className = 'font-medium text-purple-400';
+        } else {
+          lockButtonText.textContent = 'DISARMED';
+          lockButton.classList.remove('bg-purple-600', 'hover:bg-purple-700');
+          lockButton.classList.add('bg-gray-700', 'hover:bg-gray-600');
+          lockStatusText.textContent = 'DISARMED';
+          lockStatusText.className = 'font-medium text-gray-300';
+        }
+      }
+
+      
+      async function getInitialStatus() {
+        try {
+          const response = await fetch(`${serverUrl}/api/getstatus`);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          const data = await response.json();
+          const initialState = data.status === 'ARMED';
+          updateLockUI(initialState);
+          console.log('Initial system status from server:', data.status);
+        } catch (error) {
+          console.error('Could not fetch initial lock status from server:', error);
+         
+          updateLockUI(false); 
+        }
+      }
+
+      lockButton.addEventListener('click', async function() {
+        const newStatus = !isLocked ? 'ARMED' : 'DISARMED';
+        
+        try {
+          const response = await fetch(`${serverUrl}/api/setstatus`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: newStatus }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const result = await response.json();
+          console.log('Server response:', result.message);
+
+
+          updateLockUI(!isLocked);
+
+        } catch (error) {
+          console.error('Error updating lock status:', error);
+          alert('Failed to contact the server. Please ensure it is running.');
+        }
+      });
+      
+      getInitialStatus();
+    });
+  </script>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+
+<script src="global-notifications.js"></script>
+
+</body>
+</html>

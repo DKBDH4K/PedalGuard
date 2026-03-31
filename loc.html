@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PedalGuard Location History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+    }
+
+    .glass-container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 1.5rem;
+      max-width: 48rem;
+      margin-top: 1rem;
+    }
+
+    /* --- ADDED FROM HOME.HTML --- */
+    #tsparticles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -10;
+    }
+    /* --- END OF ADDED CSS --- */
+
+  </style>
+  
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+
+<body class="text-white min-h-screen flex flex-col">
+
+  <div id="tsparticles"></div>
+
+  <div class="bg-[#6c2efb] h-3 w-full"></div>
+
+
+  <nav class="bg-gradient-to-r from-[#1f2a4a] to-[#2a3a6f] flex items-center justify-between px-6 py-4">
+    <a href="Home.html" class="flex items-center space-x-2">
+      <i class="fas fa-bicycle text-[#b18aff] text-xl"></i>
+      <span class="font-semibold text-white text-lg select-none">PedalGuard</span>
+    </a>
+
+    <ul class="hidden md:flex items-center space-x-6 text-white text-sm font-semibold">
+      <li class="cursor-pointer select-none hover:underline">Settings</li>
+      <li class="cursor-pointer select-none hover:underline">Support</li>
+      <li>
+        <button aria-label="Search" class="text-white hover:text-[#b18aff]">
+          <i class="fas fa-search"></i>
+        </button>
+      </li>
+      <li>
+        <button
+          class="bg-gradient-to-r from-[#6c2efb] to-[#3a6fff] px-4 py-2 rounded-full text-white font-semibold text-sm hover:brightness-110 transition">
+          Get Protected
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  
+  <main class="flex-grow max-w-5xl mx-auto px-6 py-12 w-full">
+    <h1 class="text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#b18aff] to-[#6c8aff] mb-10">
+      Location History
+    </h1>
+
+    <section class="mb-8">
+      <h2 class="text-xl font-semibold mb-4 text-white">Latest Bike Location</h2>
+      <div id="map" class="w-full rounded-lg border border-transparent" style="height:420px; background: #334155;"></div>
+    </section>
+
+
+    <section class="mb-8 max-w-md">
+      <form id="locationForm" class="flex space-x-4">
+        <input type="text" id="locationInput" placeholder="Location history is now automated from alerts"
+          class="flex-grow bg-[#1f2a3a] border border-transparent focus:border-[#6c2efb] rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none transition"
+          required autocomplete="off" disabled />
+        <button type="submit"
+          class="bg-gradient-to-r from-[#6c2efb] to-[#3a6fff] px-6 py-2 rounded-full font-semibold text-white hover:brightness-110 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Search
+        </button>
+      </form>
+    </section>
+
+    <section>
+      <h2 class="text-xl font-semibold mb-6 text-white">Alert Location History</h2>
+      <div class="glass-container">
+        <ul id="locationList" class="space-y-4 max-w-full">
+          </ul>
+      </div>
+    </section>
+  </main>
+
+
+  <script>
+
+    let pedalMap = null;
+    let bikeMarker = null;
+
+    function initMap() {
+      // Set a default view
+      pedalMap = L.map("map").setView([20, 0], 2);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(pedalMap);
+    }
+
+    
+    function updateBikeLocation(lat, lng, timestamp) {
+      if (!pedalMap) return;
+
+      const latlng = [parseFloat(lat), parseFloat(lng)];
+
+      if (!bikeMarker) {
+        // Create a custom bike icon
+        const bikeIcon = L.icon({
+            iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2I4YmZmZiIgd2lkdGg9IjM2cHgiIGhlaWdodD0iMzZweCI+PHBhdGggZD0iTTE5IDJDMTcuOSA5IDE4LjEgNy45IDE4LjcgN0wxNS40IDExLjVDMTUuMiAxMC43IDE0LjQgMTAgMTMuNSAxMEMxMi43IDEwIDEyIDEwLjcgMTIgMTEuNUMxMiAxMi4zIDEyLjcgMTMgMTMuNSAxM0MxNC4xIDEzIDE0LjcgMTIuNiAxNSAxMkwxNy4xIDguNUMxNy4zIDkgMTcuNyA5LjMgMTggOS41VjExQzE3LjIgMTEuMyAxNi45IDExLjkgMTYuNSAxMi44QzE2LjUgMTMuNyAxNy4yIDE0LjQgMTggMTQuNEMxOCAxNS4zIDE3LjMgMTYgMTYuNSAxNkMxNS43IDE2IDE1IDE1LjMgMTUgMTQuNUMxNSAxMy43IDE1LjcgMTMgMTYuNSAxM0MxNi44IDEzIDE3LjEgMTMuMiAxNy4zIDEzLjRDMTcuNyAxMi44IDE4LjIgMTIuNCAxOSAxMi4zVjEwQzIwLjIgOS43IDIxIDguNyAyMSA3LjVDMjEgNi4yIDE5LjggNSAxOC41IDVDMTggNS44IDE3LjMgNi41IDE3LjMgNy4zQzE3LjMgNy43IDE3LjUgOC4xIDE3LjggOC4zTDE1LjIgMTIuNUMxNCAxMy4xIDEzLjIgMTMuNSAxMi4zIDEzLjVDMTIuMSAxNC4zIDExLjQgMTUgMTAuNSAxNUM5LjcgMTUgOSAxNC4zIDkgMTMuNUM5IDEyLjcgOS43IDEyIDEwLjUgMTJDMTIgMTIgMTMgMTAuOCAxMyAxMC42TDEwLjIgNkgyVjRIOEw5LjYgNy4yQzEwLjIgNy44IDEwLjggOC43IDExLjEgOUgxMC41QzkuNyA5IDkgOC4zIDkgNy41QzkgNi43IDkuNyA2IDEwLjUgNkMxMS4zIDYgMTIgNi43IDEyIDcuNUMxMiA4LjMgMTEuMyA5IDEwLjUgOUg4LjJMOC40IDEyLjVDNy45IDEyLjIgNy4yIDEyIDYuNSAxMkM0IDIgMiAxNCAyIDE0VjE2SDQuNUM0LjIgMTcgMy45IDE3LjMgMy44IDE3LjZMMC4zIDE4LjVDLTAuMSAxOC43IC0wLjEgMTkuMyAwLjMgMTkuNWwwLjQgMC40QzEgMjAgMS4yIDIwLjEgMS40IDIwLjFEOS4yIDIwIDkgMTcuNUM5IDE2LjcgOS43IDE2IDEwLjUgMTZDMTIuNyAxNiAxNC41IDE3LjggMTQuNSAyMEMxNC41IDIyLjIgMTIuNyAyNCAxMC41IDI0QzkuNyAyNCA5IDIyLjEgOSAyMi4xTDkuMyAyMEM4LjUgMjAuMyA3LjcgMjAuOCA3IDIxLjRMNy4zIDIyQzcuNCAyMi4zIDcuNyAyMi41IDggMjIuNUgxM0MyMyAyMi45IDIzLjEgOS43IDIzLjEgOS4zTDIyLjcgOEMyMi41IDcgMjIgNyAyMiA3VjMuNUMyMiAzLjIgMjEuOCAzIDIxLjUgM0gxOUMxOS44IDMgMjAuNSAyLjUgMjAuNSAxLjVDMjAuNSAwLjcgMTkuOCAwIDE5IDBabS04LjUgMThDMTIgMTggMTMgMTkgMTMgMjAuNUMxMyAyMiAxMiAyMyAxMC41IDIzUzggMjIgOCAyMC41QzggMTkgOSAxOCAxMC41IDE4WiIgLz48L3N2Zz4=',
+            iconSize:     [36, 36], // size of the icon
+            iconAnchor:   [18, 36], // point of the icon which will correspond to marker's location
+            popupAnchor:  [0, -38]  // point from which the popup should open relative to the iconAnchor
+        });
+
+        bikeMarker = L.marker(latlng, {icon: bikeIcon}).addTo(pedalMap);
+      } else {
+        bikeMarker.setLatLng(latlng);
+      }
+
+      pedalMap.setView(latlng, 16);
+
+      const popupText = `<strong>Latest Location</strong><br/>Lat: ${lat.toFixed(
+        5
+      )}, Lng: ${lng.toFixed(5)}<br/>${new Date(timestamp).toLocaleString()}`;
+      bikeMarker.bindPopup(popupText).openPopup();
+    }
+    
+    // *** BUG FIX 1: This config now MATCHES your other files ***
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY", 
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DATABASE_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET", // Changed to .appspot.com
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+
+    const database = firebase.database();
+    const alertsRef = database.ref('alerts');
+    const locationList = document.getElementById("locationList");
+
+    alertsRef.on("value", (snapshot) => {
+        const locations = [];
+        if (snapshot.exists()) {
+            snapshot.forEach(childSnapshot => {
+                const alertData = childSnapshot.val();
+
+                if (alertData.location && typeof alertData.location === 'object' && alertData.location.lat) {
+                    locations.push({
+                        key: childSnapshot.key,
+                        ...alertData
+                    });
+                }
+            });
+        }
+        
+        // *** BUG FIX 2: Sort by 'serverTimestamp' (which is in your data) instead of 'timestamp' (which is not) ***
+        locations.sort((a, b) => b.serverTimestamp - a.serverTimestamp);
+
+        if (locations.length > 0) {
+            const latestLocation = locations[0];
+            // *** BUG FIX 3: Pass 'serverTimestamp' to the update function ***
+            updateBikeLocation(latestLocation.location.lat, latestLocation.location.lng, latestLocation.serverTimestamp);
+        }
+
+        renderLocationHistory(locations);
+    });
+    
+    function renderLocationHistory(locations) {
+      locationList.innerHTML = "";
+      if (locations.length === 0) {
+        const emptyMsg = document.createElement("p");
+        emptyMsg.className = "text-gray-400 italic";
+        emptyMsg.textContent = "No location data from alerts has been recorded yet.";
+        locationList.appendChild(emptyMsg);
+        return;
+      }
+
+      locations.forEach((loc) => {
+        const li = document.createElement("li");
+        li.className =
+          "bg-[#1f2a3a] rounded-lg p-4 flex justify-between items-center border border-transparent hover:border-[#3a6fff] transition";
+
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "flex flex-col";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "font-semibold text-white text-lg";
+        nameSpan.textContent = `${loc.trigger} Alert Location`;
+        
+        const coordsSpan = document.createElement("span");
+        coordsSpan.className = "text-gray-300 text-sm";
+        coordsSpan.textContent = `Lat: ${loc.location.lat.toFixed(5)}, Lng: ${loc.location.lng.toFixed(5)}`;
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "text-gray-400 text-xs mt-1";
+        // *** BUG FIX 4: Use 'serverTimestamp' here as well ***
+        dateSpan.textContent = new Date(loc.serverTimestamp).toLocaleString();
+
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(coordsSpan);
+        infoDiv.appendChild(dateSpan);
+
+        const delBtn = document.createElement("button");
+        delBtn.className =
+          "text-[#6c2efb] hover:text-[#3a6fff] transition text-xl";
+        delBtn.setAttribute("aria-label", "Delete location entry");
+        delBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+        delBtn.addEventListener("click", () => {
+          database.ref('alerts/' + loc.key).remove();
+        });
+
+        li.appendChild(infoDiv);
+        li.appendChild(delBtn);
+        locationList.appendChild(li);
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      initMap();
+
+      // --- ADDED FROM HOME.HTML ---
+      tsParticles.load("tsparticles", {
+            background: {
+                color: "#0a0a0a",
+            },
+            particles: {
+                number: { value: 160 },
+                color: { value: "#ffffff" },
+                links: {
+                    enable: false,
+                },
+                move: {
+                    enable: true,
+                    speed: 0.5,
+                    direction: "none",
+                    outModes: {
+                        default: "out",
+                    },
+                },
+                size: {
+                    value: { min: 0.5, max: 2.5 },
+                },
+                opacity: {
+                    value: { min: 0.1, max: 0.8 },
+                },
+            },
+            interactivity: {
+                events: {
+                    onHover: {
+                        enable: true,
+                        mode: "bubble",
+                    },
+                },
+                modes: {
+                    bubble: {
+                        distance: 250,
+                        duration: 2,
+                        size: 4,
+                        opacity: 1,
+                    },
+                },
+            },
+        });
+      // --- END OF ADDED CODE ---
+    });
+  </script>
+
+  <script src="global-notifications.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
+
+</body>
+</html>

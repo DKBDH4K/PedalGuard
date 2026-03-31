@@ -1,0 +1,16 @@
+{
+  "name": "pedalguard-local-server",
+  "version": "1.0.0",
+  "description": "Local server to relay alerts from ESP8266 to Firebase.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "firebase-admin": "^12.0.0"
+  }
+}

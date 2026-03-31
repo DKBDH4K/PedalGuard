@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PedalGuard Feedback</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- REMOVED old Firebase compat scripts -->
+  
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+    }
+    .glass-container {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 2rem;
+      max-width: 48rem;
+      margin-top: 2rem;
+    }
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      margin-left: -125px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 16px;
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 30px;
+      transition: visibility 0.5s, opacity 0.5s linear;
+      opacity: 0;
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body class="bg-[#121b2e] text-white min-h-screen flex flex-col">
+
+  <div class="bg-[#6c2efb] h-3 w-full"></div>
+
+  <nav class="bg-gradient-to-r from-[#1f2a4a] to-[#2a3a6f] flex items-center justify-between px-6 py-4">
+    <!-- Assuming Home.html is a real page, otherwise change href="#" -->
+   <a href="Home.html" class="flex items-center space-x-2">
+      <i class="fas fa-bicycle text-[#b18aff] text-xl"></i>
+      <span class="font-semibold text-white text-lg select-none">PedalGuard</span>
+    </a>
+  </nav>
+
+  <main class="flex-grow max-w-3xl mx-auto px-6 py-12 w-full">
+    <h1 class="text-4xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-[#b18aff] to-[#6c8aff] mb-10">
+      Submit Feedback
+    </h1>
+
+    <div class="glass-container">
+      <form id="feedbackForm" class="space-y-6">
+        <div>
+          <label for="name" class="block mb-2 text-gray-300 font-medium">Name</label>
+          <input type="text" id="name" placeholder="Your name" class="w-full bg-[#1f2a3a] border border-transparent focus:border-[#6c2efb] rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none transition" required />
+        </div>
+
+        <div>
+          <label for="email" class="block mb-2 text-gray-300 font-medium">Email</label>
+          <input type="email" id="email" placeholder="Your email address" class="w-full bg-[#1f2a3a] border border-transparent focus:border-[#6c2efb] rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none transition" required />
+        </div>
+
+        <div>
+          <label for="feedbackType" class="block mb-2 text-gray-300 font-medium">Feedback Type</label>
+          <select id="feedbackType" class="w-full bg-[#1f2a3a] border border-transparent focus:border-[#6c2efb] rounded-md px-4 py-2 text-white focus:outline-none transition" required>
+            <option value="" disabled selected>Select a feedback type</option>
+            <option value="bug">Bug Report</option>
+            <option value="feature">Feature Request</option>
+            <option value="general">General Comment</option>
+            <option value="suggestion">Suggestion</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="message" class="block mb-2 text-gray-300 font-medium">Message</label>
+          <textarea id="message" rows="5" placeholder="Describe your feedback in detail" class="w-full bg-[#1f2a3a] border border-transparent focus:border-[#6c2efb] rounded-md px-4 py-2 text-white placeholder-gray-500 focus:outline-none transition resize-none" required></textarea>
+        </div>
+
+        <button type="submit" class="bg-gradient-to-r from-[#6c2efb] to-[#3a6fff] px-6 py-3 rounded-full font-semibold text-white hover:brightness-110 transition">
+          Send Feedback
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+
+  <!-- UPDATED SCRIPT to use modern modular Firebase SDKs -->
+  <script type="module">
+    // Import v11+ modular SDKs
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // --- USE ENVIRONMENT VARIABLES (MANDATORY) ---
+    // DO NOT use hardcoded config
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+    let app, auth, db;
+    let currentUserId = 'anonymous'; // Default user ID
+    let currentDisplayName = '';
+    let currentEmail = '';
+
+    // Get references to DOM elements
+    const form = document.getElementById("feedbackForm");
+    const nameInput = document.getElementById("name");
+    const emailInput = document.getElementById("email");
+    const feedbackTypeInput = document.getElementById("feedbackType");
+    const messageInput = document.getElementById("message");
+    const toast = document.getElementById('toast');
+
+    // Function to show the toast message
+    function showToast(message) {
+      toast.textContent = message;
+      toast.className = "show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 3000);
+    }
+
+    // Main function to initialize Firebase and add listeners
+    async function initializeAppAndAuth() {
+      try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+        setLogLevel('Debug'); // Enable debug logging for Firestore
+
+        // --- Handle Authentication ---
+        if (initialAuthToken) {
+          await signInWithCustomToken(auth, initialAuthToken);
+        } else {
+          await signInAnonymously(auth);
+        }
+
+        // Listen for auth state changes
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            console.log("User is signed in:", user);
+            currentUserId = user.uid;
+            currentDisplayName = user.displayName || '';
+            currentEmail = user.email || '';
+            
+            // Pre-fill form (only if fields are empty)
+            if (!nameInput.value) {
+              nameInput.value = currentDisplayName;
+            }
+            if (!emailInput.value) {
+              emailInput.value = currentEmail;
+            }
+          } else {
+            console.log("No user is signed in.");
+            currentUserId = 'anonymous';
+            currentDisplayName = '';
+            currentEmail = '';
+          }
+        });
+
+      } catch (error) {
+        console.error("Firebase Initialization Error:", error);
+        showToast("Error connecting to server. Please refresh.");
+      }
+    }
+
+    // Handle form submission
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault(); // Prevent default form submission
+
+      const name = nameInput.value.trim();
+      const email = emailInput.value.trim();
+      const feedbackType = feedbackTypeInput.value;
+      const message = messageInput.value.trim();
+
+      // Validate that fields are not empty
+      if (!name || !email || !feedbackType || !message) {
+        showToast("Please fill in all required fields.");
+        return; // Stop execution if validation fails
+      }
+
+      // Prepare data for Firestore
+      const feedbackData = {
+        name: name,
+        email: email,
+        feedbackType: feedbackType,
+        message: message,
+        timestamp: Date.now(),
+        userId: currentUserId, 
+        status: 'new' 
+      };
+
+      // --- Use Firestore to add document ---
+      // This path stores data publicly for this app
+      const dbPath = `/artifacts/${appId}/public/data/feedback`;
+
+      try {
+        const docRef = await addDoc(collection(db, dbPath), feedbackData);
+        console.log("Feedback submitted with ID: ", docRef.id);
+        showToast("Thank you! Your feedback has been sent.");
+        form.reset(); // Clear the form
+        
+        // Repopulate user info
+        nameInput.value = currentDisplayName;
+        emailInput.value = currentEmail;
+
+      } catch (error) {
+        console.error("Error sending feedback to Firestore:", error);
+        showToast("An error occurred. Please try again.");
+      }
+    });
+
+    // Run the initialization function when the DOM is loaded
+    document.addEventListener("DOMContentLoaded", initializeAppAndAuth);
+
+  </script>
+</body>
+</html>
+
